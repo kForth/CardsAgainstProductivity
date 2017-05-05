@@ -1,0 +1,29 @@
+<ons-page id="create_room" ng-controller="JoinRoomController">
+
+    <ons-toolbar>
+        <div class="left">
+            <ons-back-button>Cancel</ons-back-button>
+        </div>
+        <div class="center">Join Room</div>
+        <div class="right">
+            <ons-toolbar-button>
+                <ons-icon icon="ion-navicon-round"></ons-icon>
+            </ons-toolbar-button>
+        </div>
+    </ons-toolbar>
+
+    <section style="padding: 8px;">
+        <ons-list ng-repeat="room in rooms | orderBy:name" style="margin-bottom: 2px;">
+            <ons-list-item ng-click="joinRoom(room)">
+                {{ room.name }}
+                <div class="right">
+                    <ons-toolbar-button>
+                        <ons-icon ng-if="room.privacy == 'private'" icon="ion-locked"></ons-icon>
+                        <ons-icon ng-if="room.privacy == 'public'" icon="ion-person-stalker"></ons-icon>
+                    </ons-toolbar-button>
+                </div>
+            </ons-list-item>
+        </ons-list>
+    </section>
+
+</ons-page>

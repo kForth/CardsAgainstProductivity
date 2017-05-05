@@ -1,0 +1,65 @@
+<ons-page id="game" ng-controller="RoomController">
+    <ons-splitter>
+        <ons-splitter-side id="menu" side="right" width="220px" collapse swipeable>
+            asdlkf
+        </ons-splitter-side>
+        <ons-splitter-content>
+            <ons-toolbar>
+                <div class="left">
+                </div>
+                <div class="center">{{ room.name }}</div>
+                <div class="right">
+                    <ons-toolbar-button>
+                        <ons-icon icon="md-menu" ng-click="document.getElementById('menu').open()"></ons-icon>
+                    </ons-toolbar-button>
+                </div>
+
+            </ons-toolbar>
+
+
+            <section style="padding: 8px; text-align: center">
+                <b ng-show="room.card_czar === username && room.game_phase != 'setup_next'">You are the Card Czar.</b>
+                <b ng-show="room.card_czar != username && room.game_phase != 'setup_next'">{{ room.card_czar }} is the
+                    Card Czar.</b>
+                <b ng-show="room.game_phase == 'setup_next'">Waiting</b>
+            </section>
+
+            <section class="card black_card">
+                {{ room.black_card.text }}
+            </section>
+
+            <section style="padding: 4px 8px;" class="">
+                <b>
+                    {{ room.white_card_title }}
+                </b>
+            </section>
+
+            <section class="card_area">
+                <div class="card white_card" ng-repeat="card in room.white_cards"
+                     ng-class="{'selected': selected_cards.indexOf(card) > -1}" ng-click="selectCard(card)">
+                    {{ isArray(card) }}
+                    <div ng-show="isArray(card)" ng-repeat="c in card">{{ c }}<p></p></div>
+                    <div ng-show="!isArray(card)">{{ card }}</div>
+                    <div class="select_num" ng-show="selected_cards.indexOf(card) > -1">{{ selected_cards.indexOf(card)
+                        + 1 }}
+                    </div>
+                </div>
+            </section>
+
+            <section style="padding: 8px">
+                <ons-button modifier="large" ng-click="submit()"
+                            ng-show="room.game_phase=='select_winner' && room.card_czar == username && !room.submitted">
+                    Submit
+                </ons-button>
+                <ons-button modifier="large" ng-click="submit()"
+                            ng-show="room.game_phase=='select_card' && !room.submitted && room.card_czar != username">
+                    Submit
+                </ons-button>
+                <ons-button modifier="large" ng-click="submit()"
+                            ng-show="room.game_phase=='setup_next' && !room.submitted">Ready
+                </ons-button>
+            </section>
+        </ons-splitter-content>
+    </ons-splitter>
+
+</ons-page>

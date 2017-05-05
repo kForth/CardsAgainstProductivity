@@ -1,0 +1,53 @@
+.checkbox_icon{
+    padding-right: 5px;
+}
+
+.pack_select_box{
+    max-height: 200px;
+    overflow-y: scroll;
+}
+
+.error{
+    color: #f00;
+    font-size: 12px;
+}
+
+.card_area {
+    padding: 0;
+    margin: 0;
+    /*height: 300px;*/
+    overflow-y: scroll;
+    height: calc(100% - 250px);
+}
+
+.card {
+    padding: 10px;
+    margin: 8px;
+    border-radius: 5px;
+    overflow-y: scroll;
+    border: 1px solid #000;
+}
+
+.black_card {
+    height: 80px;
+    background: #111111;
+    color: #fff;
+}
+
+.white_card {
+    height: 50px;
+    background: #fff;
+    color: #111;
+}
+
+.white_card.selected {
+    background: #aaa;
+}
+
+.select_num {
+    float: right;
+    background: #111;
+    color: #eee;
+    border-radius: 15px;
+    padding: 2px 5px;
+}

@@ -1,0 +1,48 @@
+<ons-page id="create_room" ng-controller="CreateRoomController">
+
+    <ons-toolbar>
+        <div class="left">
+            <ons-back-button>Cancel</ons-back-button>
+        </div>
+        <div class="center">Create Room</div>
+        <div class="right">
+            <ons-toolbar-button>
+                <ons-icon icon="ion-navicon-round"></ons-icon>
+            </ons-toolbar-button>
+        </div>
+    </ons-toolbar>
+
+    <section style="padding: 8px">
+        <b>Room Name:</b>
+        <ons-input modifier="underbar" style="width: 100%" ng-model="room_name"></ons-input>
+        <p></p>
+        <b>Room Password:</b>
+        <ons-input modifier="underbar" style="width: 100%" ng-model="room_password"></ons-input>
+        <p></p>
+
+        <ons-list class="pack_select_box">
+            <ons-list-header>Select Card Packs</ons-list-header>
+            <ons-list-item tappable ng-click="selectAll()">
+                <div ng-show="selected_packs.length != packs.length">
+                    <ons-icon icon="ion-ios-circle-outline" class="checkbox_icon"></ons-icon>
+                    Select All
+                </div>
+                <div ng-show="selected_packs.length == packs.length">
+                    <ons-icon icon="ion-ios-circle-filled" class="checkbox_icon"></ons-icon>
+                    Select None
+                </div>
+            </ons-list-item>
+            <ons-list-item tappable ng-repeat="pack in packs | orderBy:name" ng-click="selectPack(pack)">
+                <ons-icon icon="ion-ios-circle-filled" ng-show="selected_packs.indexOf(pack.id) >= 0" class="checkbox_icon"></ons-icon>
+                <ons-icon icon="ion-ios-circle-outline" ng-show="selected_packs.indexOf(pack.id) < 0" class="checkbox_icon"></ons-icon>
+                {{ pack.name }}
+            </ons-list-item>
+        </ons-list>
+
+    </section>
+
+    <section style="padding: 8px">
+        <ons-button modifier="large" ng-click="createRoom()">Create</ons-button>
+    </section>
+
+</ons-page>

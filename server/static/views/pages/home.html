@@ -1,0 +1,43 @@
+<ons-page id="home">
+    <ons-toolbar>
+        <div class="left">
+            <ons-toolbar-button>
+            </ons-toolbar-button>
+        </div>
+        <div class="center"></div>
+        <div class="right">
+            <ons-toolbar-button>
+                <ons-icon icon="ion-navicon-round"></ons-icon>
+            </ons-toolbar-button>
+        </div>
+    </ons-toolbar>
+
+    <section style="padding: 8px">
+        <h1 style="text-align: center">
+            Cards Against Productivity
+        </h1>
+    </section>
+
+    <section style="padding: 8px" ng-show="username != undefined">
+        <ons-button modifier="large cta" ng-click="nav('join_room.html')">
+            Join Room
+        </ons-button>
+        <p></p>
+        <ons-button modifier="large" ng-click="nav('create_room.html');">
+            Create Room
+        </ons-button>
+        <br>
+        <br>
+        <br>
+        <br>
+        <br>
+        <div style="float:bottom">
+            <h3 style="text-align: center; width: 100%">{{ username }}</h3>
+            <ons-button modifier="large" ng-click="getUsername()">
+                Change Name
+            </ons-button>
+        </div>
+
+    </section>
+
+</ons-page>

@@ -1,0 +1,12 @@
+├── angular#1.6.4 extraneous (1.6.6-build.5434+sha.823c7ed available)
+├─┬ angular-bootstrap#2.5.0 extraneous
+│ └── angular#1.6.4 (1.6.6-build.5434+sha.823c7ed available)
+├─┬ angular-cookies#1.6.4 extraneous (1.6.6-build.5434+sha.823c7ed available)
+│ └── angular#1.6.4 (latest is 1.6.6-build.5434+sha.823c7ed)
+├─┬ angular-route#1.6.4 extraneous (1.6.6-build.5434+sha.823c7ed available)
+│ └── angular#1.6.4
+├─┬ angular-socket-io#0.7.0 extraneous
+│ └── angular#1.6.4 (1.6.6-build.5434+sha.823c7ed available)
+├─┬ bootstrap#3.3.7 extraneous (latest is 4.0.0-alpha.6)
+│ └── jquery#3.2.1
+└── onsenui#2.4.2 extraneous

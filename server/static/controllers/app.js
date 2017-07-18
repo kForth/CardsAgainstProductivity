@@ -154,6 +154,7 @@ module.controller('RoomController', function ($scope, $http, $cookies, $timeout)
     $scope.room = {};
     $scope.room.submitted = false;
     $scope.room.game_phase = '';
+    $scope.sidebar_shown = false;
 
     /*
      * Game Phases
@@ -164,8 +165,15 @@ module.controller('RoomController', function ($scope, $http, $cookies, $timeout)
      *
      */
 
-    $scope.submit = function () {
+    $scope.submitUser = function () {
+        console.log("Submit");
         $scope.room.submitted = true;
+    };
+
+
+    $scope.enableMenu = function(){
+        console.log("asdf");
+        // document.getElementById('menu').open();
     };
 
     $scope.selectCard = function (card) {

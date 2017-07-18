@@ -4,7 +4,6 @@ from random import shuffle
 from time import time, sleep
 
 from flask import Flask, jsonify, make_response, request
-import better_exceptions
 
 from server.runners import Runner
 
@@ -35,7 +34,6 @@ def load_deck(decks):
         'black_cards': black_cards,
         'white_cards': white_cards
     }
-
     return data
 
 
@@ -110,7 +108,7 @@ def update_rooms():
                     room['hands'][player] = []
                 for i in range(len(room['hands'][player]), 7):
                     room['hands'][player].append(room['deck']['white_cards'].pop())
-            if len(room['players_submitted']) == len(room['players']) and len(room['players']) >= 1:
+            if len(room['players_submitted']) == len(room['players']) and len(room['players']) >= 2:
                 room['last_card_czar'] = room['card_czar']
                 room['card_czar'] = get_next_czar(room)
                 room['black_card'] = room['deck']['black_cards'].pop()
@@ -183,12 +181,12 @@ def get_room():
                 if winner not in room['points'].keys():
                     room['points'][winner] = 0
                 room['points'][winner] += 1
-                room['black_card']['text'] = "{0} Wins and now has {1} point{2}!".format(winner, room['points'][winner], "" if room['points'][winner] == 1 else "s")
+                suffix = "" if room['points'][winner] == 1 else "s"
+                room['black_card']['text'] = "{0} Wins and now has {1} point{2}!".format(winner, room['points'][winner], suffix)
                 print("Winning cards: {}".format(list(data['cards'])))
         else:
             pass
 
-    # player_room['selected_cards'][username] = data['cards']
     player_room['submitted'] = username in player_room['players_submitted']
 
     return make_response(jsonify(player_room))

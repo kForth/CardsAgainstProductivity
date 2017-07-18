@@ -6,9 +6,9 @@
         </div>
         <div class="center"></div>
         <div class="right">
-            <ons-toolbar-button>
-                <ons-icon icon="ion-navicon-round"></ons-icon>
-            </ons-toolbar-button>
+            <!--<ons-toolbar-button>-->
+                <!--<ons-icon icon="ion-navicon-round"></ons-icon>-->
+            <!--</ons-toolbar-button>-->
         </div>
     </ons-toolbar>
 
@@ -18,7 +18,7 @@
         </h1>
     </section>
 
-    <section style="padding: 8px" ng-show="username != undefined">
+    <section style="padding: 8px">
         <ons-button modifier="large cta" ng-click="nav('join_room.html')">
             Join Room
         </ons-button>
@@ -26,18 +26,6 @@
         <ons-button modifier="large" ng-click="nav('create_room.html');">
             Create Room
         </ons-button>
-        <br>
-        <br>
-        <br>
-        <br>
-        <br>
-        <div style="float:bottom">
-            <h3 style="text-align: center; width: 100%">{{ username }}</h3>
-            <ons-button modifier="large" ng-click="getUsername()">
-                Change Name
-            </ons-button>
-        </div>
-
     </section>
 
 </ons-page>

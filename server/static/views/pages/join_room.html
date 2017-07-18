@@ -14,7 +14,7 @@
 
     <section style="padding: 8px;">
         <ons-list ng-repeat="room in rooms | orderBy:name" style="margin-bottom: 2px;">
-            <ons-list-item ng-click="joinRoom(room)">
+            <ons-list-item ng-click="selectRoom(room)">
                 {{ room.name }}
                 <div class="right">
                     <ons-toolbar-button>

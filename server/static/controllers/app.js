@@ -1,56 +1,53 @@
-var module = angular.module('app', ['onsen', 'ngCookies']);
+var module = angular.module('app', ['onsen', 'ngCookies', 'btford.socket-io']);
 
 module.controller('AppController', function ($scope, $cookies, $http) {
+        $scope.nav = function (page) {
+            $scope.navi.pushPage('../../../static/views/pages/' + page);
+        };
 
-    $scope.getUsername = function () {
-        $scope.username = undefined;
-        ons.notification.prompt('What is your name?').then(function (username) {
-            $http.post('/login', {'username': username, 'old': $scope.username})
-                .then(function (resp) {
-                        if (resp.status == 200) {
-                            $scope.username = username;
-                            $cookies.put('username', username);
-                        }
-                        else {
-                            $scope.getUsername();
-                        }
-                    },
-                    function (resp) {
-                        if(resp.status == 400){
-                            ons.notification.alert("Username not valid. Try again!");
-                        }
-                        else if(resp.status == 409){
-                            ons.notification.alert("Username taken!");
-                        }
-                        $scope.getUsername();
-                    });
+    })
+    .factory('socket', function (socketFactory) {
+        var socket = socketFactory({
+            ioSocket: io.connect('/game')
         });
-    };
-
-    $scope.nav = function (page) {
-        $cookies.put('username', $scope.username);
-        $scope.navi.pushPage('../../../static/views/pages/' + page);
-    };
-
-
-    $scope.username = $cookies.get('username');
-    if ($scope.username === undefined) {
-        $scope.getUsername();
-    }
-
-});
+        socket.forward('error');
+        return socket;
+    });
 
 module.controller('NavigationController', function ($scope, $http, $cookies) {
     ons.ready(function () {
         $scope.navi.pushPage('../../../static/views/pages/home.html');
     });
 
+    $scope.selectRoom = function(room){
+        ons.notification.prompt('What is your name?').then(function (username) {
+            $http.post('/check_username', {'room': room, 'username': username})
+                .then(function (resp) {
+                        if (resp.status == 200) {
+                            $scope.username = username;
+                            $cookies.put('username', username);
+                            checkPrivacy(room);
+                        }
+                        else {
+                            $scope.selectRoom();
+                        }
+                    },
+                    function (resp) {
+                        if (resp.status == 400) {
+                            ons.notification.alert("Username not valid. Try again!").then($scope.selectRoom);
+                        }
+                        else if (resp.status == 409) {
+                            ons.notification.alert("Username taken!").then($scope.selectRoom);
+                        }
+                    });
+        });
+    };
 
-    $scope.joinRoom = function (room) {
+    function checkPrivacy(room){
         if (room.privacy == 'private') {
             ons.notification.prompt('What is the password?').then(function (password) {
                 if (password == room.password) {
-                    joinRoom(room);
+                    $scope.actuallyJoin(room);
                 }
                 else {
                     ons.notification.alert("Incorrect Password!");
@@ -58,26 +55,16 @@ module.controller('NavigationController', function ($scope, $http, $cookies) {
             });
         }
         else {
-            joinRoom(room);
+            $scope.actuallyJoin(room);
         }
 
-    };
+    }
 
-    function joinRoom(room) {
-        var data = {
-            'username': $cookies.get('username'),
-            'room_name': room.name
-        };
-        $http.post('/join', data).then(
-            function (ignored) {
-                $cookies.put('room_name', room.name);
-                $scope.navi.popPage()
-                    .then(function () {
-                        $scope.navi.replacePage('../../../static/views/pages/game.html');
-                    });
-            },
-            function (resp) {
-
+    $scope.actuallyJoin = function(room){
+        $cookies.put('room_name', room.name);
+        $scope.navi.popPage()
+            .then(function () {
+                $scope.navi.replacePage('../../../static/views/pages/game.html');
             });
     }
 
@@ -94,6 +81,7 @@ module.controller('CreateRoomController', function ($scope, $http, $cookies) {
 
     $scope.createRoom = function () {
         var data = {
+            'username': $scope.username,
             'name': $scope.room_name,
             'password': $scope.room_password,
             'privacy': ($scope.room_password != undefined && $scope.room_password.length > 0 ? 'private' : 'public'),
@@ -102,8 +90,9 @@ module.controller('CreateRoomController', function ($scope, $http, $cookies) {
 
         $http.post('/create', data)
             .then(
-                function (resp) {
-                    $scope.joinRoom(data);
+                function (ignored) {
+                    $cookies.put('username', $scope.username);
+                    $scope.actuallyJoin(data);
                 },
                 function (resp) {
                     if (resp.status == 409) {
@@ -135,26 +124,47 @@ module.controller('CreateRoomController', function ($scope, $http, $cookies) {
     };
 
     $scope.selectPrivacy = function (event) {
-        console.log(event);
+        // console.log(event);
     }
 });
 
-module.controller('JoinRoomController', function ($scope, $http, $cookies) {
-    $scope.username = $cookies.get('username');
-
+module.controller('JoinRoomController', function ($scope, $http) {
     $http.get('/get/rooms').then(function (resp) {
         $scope.rooms = resp.data;
     });
-
 });
 
-module.controller('RoomController', function ($scope, $http, $cookies, $timeout) {
+module.controller('RoomController', function ($scope, $http, $cookies, $timeout, socket) {
     $scope.username = $cookies.get('username');
     $scope.selected_cards = [];
+    var cards_to_submit = [];
     $scope.room = {};
-    $scope.room.submitted = false;
     $scope.room.game_phase = '';
     $scope.sidebar_shown = false;
+
+    socket.forward('info', $scope);
+    $scope.$on('socket:info', function (ev, data) {
+        console.log(data);
+    });
+
+    var last_game_phase;
+    socket.forward('update', $scope);
+    $scope.$on('socket:update', function (ev, data) {
+        console.log("UPDATE!!!");
+        $scope.room = data;
+        if(last_game_phase != $scope.room.game_phase){
+            console.log("New Phase");
+            $scope.selected_cards = [];
+            cards_to_submit = [];
+        }
+        last_game_phase = $scope.room.game_phase;
+    });
+
+    var data = {
+        'username': $cookies.get('username'),
+        'room_name': $cookies.get('room_name')
+    };
+    socket.emit('join', data);
 
     /*
      * Game Phases
@@ -165,52 +175,26 @@ module.controller('RoomController', function ($scope, $http, $cookies, $timeout)
      *
      */
 
-    $scope.submitUser = function () {
-        console.log("Submit");
-        $scope.room.submitted = true;
-    };
-
 
     $scope.enableMenu = function(){
-        console.log("asdf");
+        console.log("Enable Menu");
         // document.getElementById('menu').open();
     };
 
-    $scope.selectCard = function (card) {
-        if ($scope.selected_cards.indexOf(card) > -1) {
-            $scope.selected_cards.splice(card, 1);
-        }
-        else if ($scope.selected_cards.length < $scope.room.num_to_select) {
-            $scope.selected_cards.push(card);
-        }
+    $scope.submitButton = function () {
+        socket.emit('submit_button', cards_to_submit);
     };
 
-    var last_game_phase;
-    function updateGame() {
-        console.log($scope.selected_cards);
-        var data = {
-            'room_name': $cookies.get('room_name'),
-            'username': $scope.username,
-            'submitted': $scope.room.submitted,
-            'game_phase': $scope.room.game_phase,
-            'cards': $scope.selected_cards
-        };
-        $http.post('/get/room', data)
-            .then(
-                function (resp) {
-                    $scope.room = resp.data;
-                    var game_phase = $scope.room.game_phase;
-                    if(last_game_phase != game_phase){
-                        console.log(resp.data);
-                        $scope.selected_cards = [];
-                        $scope.room.submitted = false;
-                    }
-                    last_game_phase = game_phase;
-                });
 
-        $timeout(updateGame, 2000)
-    }
-
-    $timeout(updateGame, 0)
+    $scope.selectCard = function (card) {
+        if($scope.selected_cards.indexOf(card.toString()) > -1) {
+            $scope.selected_cards = [];
+            cards_to_submit = [];
+        }
+        else if ($scope.selected_cards.length < $scope.room.num_to_select) {
+            $scope.selected_cards.push(card.toString());
+            cards_to_submit = cards_to_submit.concat(card)
+        }
+    };
 
 });

@@ -5,6 +5,7 @@ from random import shuffle
 from flask import Flask, jsonify, make_response, request
 from flask_socketio import SocketIO, emit, join_room, leave_room
 
+from server.cards import Deck
 from server.runners import Runner
 
 app = Flask(__name__)
@@ -29,25 +30,79 @@ def load_deck(decks):
     return data
 
 
+@socketio.on('connect', namespace='/game')
+def connect():
+    emit('info', 'Connected!', namespace='/game')
+
+
+@socketio.on('join', namespace='/game')
+def join(data):
+    username = data['username']
+    room_name = data['room_name']
+    join_room(room_name)
+    sid = request.sid
+    room = rooms[room_name]
+    sid_rooms[sid] = room_name
+    room['usernames'][sid] = username
+    room['connected_players'].append(username)
+    num_cards = 7
+    if username in room['hands'].keys():
+        num_cards -= len(room['hands'][username])
+    else:
+        room['hands'][username] = []
+    room['hands'][username] += decks[room_name].draw_white_cards(num_cards)
+    update_room(room_name)
+
+
+@socketio.on('submit_button', namespace='/game')
+def submit(selected_cards=None):
+    sid = request.sid
+    room_name = sid_rooms[sid]
+    room = rooms[room_name]
+    username = room['usernames'][sid]
+    if username not in room['players_submitted']:
+        room['players_submitted'].append(username)
+        if selected_cards is not None:
+            room['selected_cards'][username] = selected_cards
+            if room['game_phase'] == 'select_card':
+                for card in selected_cards:
+                    room['hands'][username].remove(card)
+    update_room(room_name)
+
+
+@socketio.on('leave', namespace='/game')
+def leave():
+    sid = request.sid
+    room = rooms[sid_rooms[sid]]
+    room_name = room["name"]
+    leave_room(room_name)
+    username = room['usernames'][sid]
+    room['connected_players'].remove(room['usernames'][sid])
+    del sid_rooms[sid]
+    del room['usernames'][sid]
+    del room['hands'][username]
+    del room['points'][username]
+    update_room(room_name)
+
+
+@socketio.on('disconnect', namespace='/game')
+def disconnect():
+    sid = request.sid
+    room = rooms[sid_rooms[sid]]
+    room_name = room["name"]
+    leave_room(room_name)
+    room['connected_players'].remove(room['usernames'][sid])
+    del room['usernames'][sid]
+    del sid_rooms[sid]
+    if len(room['usernames'].keys()) < 1:
+        del decks[room['name']]
+        del rooms[room['name']]
+    update_room(room_name)
+
+
 @app.route('/')
 def index():
     return app.send_static_file(filename='views/index.html')
-
-
-@app.route('/join', methods=['POST'])
-def join_room():
-    if request.is_json:
-        data = request.json
-        username = data['username']
-        room_name = data['room_name']
-        if room_name not in rooms.keys():
-            return make_response(jsonify({}), 404)
-        if 'players' not in rooms[room_name].keys():
-            rooms[room_name]['players'] = []
-        if username not in rooms[room_name]['players']:
-            rooms[room_name]['players'].append(username)
-            rooms[room_name]['hands'][username] = [rooms[room_name]['deck']['white_cards'].pop() for i in range(7)]
-    return make_response(jsonify({}))
 
 
 @app.route('/create', methods=['POST'])
@@ -56,32 +111,21 @@ def create_room():
     if room_data['name'] in rooms.keys():
         return make_response(jsonify({'error': 'name'}), 409)
     room_data['game_phase'] = 'setup_next'
-    room_data['last_game_phase'] = room_data['game_phase']
-    room_data['last_card_czar'] = ''
     room_data['card_czar'] = ''
-    room_data['black_card'] = {}
+    room_data['black_card'] = {
+        'text': '',
+        'owner': '',
+        'num_select': 0
+    }
     room_data['hands'] = {}
-    room_data['players'] = []
+    room_data['usernames'] = {}
+    room_data['connected_players'] = []
     room_data['players_submitted'] = []
     room_data['selected_cards'] = {}
     room_data['points'] = {}
-    room_data['deck'] = load_deck(room_data['packs'])
+    decks[room_data['name']] = Deck(room_data['packs'])
     rooms[room_data['name']] = room_data
-    print(rooms)
     return make_response(jsonify({}), 200)
-
-
-@app.route('/login', methods=['POST'])
-def login():
-    username = request.json['username']
-    if 3 <= len(username) <= 10:
-        if username not in usernames:
-            usernames.append(username)
-        else:
-            return make_response(jsonify({}), 409)
-        return make_response(jsonify({}), 200)
-    else:
-        return make_response(jsonify({}), 400)
 
 
 @app.route('/get/rooms', methods=['GET'])
@@ -90,109 +134,100 @@ def get_rooms():
     return make_response(jsonify(temp_rooms))
 
 
-def update_rooms():
-    for room_name in rooms.keys():
-        room = rooms[room_name]
-        if room['game_phase'] == 'setup_next':
-            room['card_czar'] = ""
-            for player in room['players']:
-                if player not in room['hands'].keys():
-                    room['hands'][player] = []
-                for i in range(len(room['hands'][player]), 7):
-                    room['hands'][player].append(room['deck']['white_cards'].pop())
-            if len(room['players_submitted']) == len(room['players']) and len(room['players']) >= 2:
-                room['last_card_czar'] = room['card_czar']
-                room['card_czar'] = get_next_czar(room)
-                room['black_card'] = room['deck']['black_cards'].pop()
-                room['black_card']['text'] = room['black_card']['text'].replace('_', '________')
-                room['game_phase'] = 'select_card'
-                room['selected_cards'] = {}
-                room['players_submitted'] = []
-
-        elif room['game_phase'] == 'select_card':
-            if len(room['players_submitted']) == len(room['players']) - 1:
-                room['game_phase'] = 'select_winner'
-                room['white_card_title'] = "Submitted Cards"
-                room['white_cards'] = list(room['selected_cards'].values())
-                room['players_submitted'] = []
-        elif room['game_phase'] == 'select_winner':
-            if room['card_czar'] in room['players_submitted'] and len(room['selected_cards'][room['card_czar']]) == room['black_card']['pick']:
-                room['game_phase'] = 'setup_next'
-                room['players_submitted'] = []
-            if len(room['white_cards']) < 1:
-                room['game_phase'] = 'setup_next'
-
-        room['last_game_phase'] = room['game_phase']
-
-
-@app.route('/get/room', methods=['POST'])
-def get_room():
-    data = request.json
-    username = data['username']
-    room_name = data['room_name']
+def update_room(room_name):
     room = rooms[room_name]
 
-    if data['submitted'] and username not in room['players_submitted'] and data['game_phase'] == room['game_phase']:
-        room['players_submitted'].append(username)
-    elif not data['submitted'] and username in room['players_submitted'] and data['game_phase'] == room['game_phase']:
-        room['players_submitted'].remove(username)
-
-    player_room = dict(room)
-    player_room['hands'] = {}
-    player_room['deck'] = {}
-    player_room['num_to_select'] = 0
-
     if room['game_phase'] == 'setup_next':
-        player_room['white_card_title'] = 'Your Hand'
-        player_room['white_cards'] = room['hands'][username]
-        player_room['card_czar'] = ""
+        for player in room['usernames'].values():
+            if player not in room['hands'].keys():
+                room['hands'][player] = []
+            room['hands'][player] += decks[room_name].draw_white_cards(7 - len(room['hands'][player]))
+
+        if len(room['players_submitted']) == len(room['usernames'].values()) and len(room['usernames'].values()) >= 2:
+            room['card_czar'] = get_next_czar(room)
+            room['black_card'] = decks[room_name].draw_black_card()
+            room['black_card']['text'] = room['black_card']['text'].replace('_', '________')
+            room['game_phase'] = 'select_card'
+            room['selected_cards'] = {}
+            room['players_submitted'] = []
+
     elif room['game_phase'] == 'select_card':
-        if player_room['card_czar'] == username:
-            player_room['white_card_title'] = 'Players Submitted'
-            player_room['white_cards'] = room['players_submitted']
-        else:
-            player_room['num_to_select'] = room['black_card']['pick']
-            player_room['white_cards'] = room['hands'][username]
-            player_room['white_card_title'] = "Make a selection"
-            if data['submitted'] and data['game_phase'] == room['game_phase'] and len(data['cards']) == room['black_card']['pick']:
-                room['selected_cards'][username] = data['cards']
-                for card in data['cards']:
-                    room['hands'][username].remove(card)
+        if len(room['players_submitted']) == len(room['usernames'].values()) - 1:
+            room['game_phase'] = 'select_winner'
+            room['white_card_title'] = "Submitted Cards"
+            room['white_cards'] = list(room['selected_cards'].values())
+            room['players_submitted'] = []
+
     elif room['game_phase'] == 'select_winner':
-        if player_room['card_czar'] == username:
-            player_room['num_to_select'] = 1
-            if username in player_room['players_submitted'] and data['game_phase'] == player_room['game_phase'] and len(data['cards']) > 0:
-                for player in room['selected_cards'].keys():
-                    if all([e in data['cards'][0] for e in room['selected_cards'][player]]) and player != room['card_czar']:
-                        winner = player
-                        print("{} Wins!".format(player))
-                        break
-                else:
-                    winner = "Nobody?"
-                room['selected_cards'][username] = list(data['cards'])[0]
-                if winner not in room['points'].keys():
-                    room['points'][winner] = 0
-                room['points'][winner] += 1
-                suffix = "" if room['points'][winner] == 1 else "s"
-                room['black_card']['text'] = "{0} Wins and now has {1} point{2}!".format(winner, room['points'][winner], suffix)
-                print("Winning cards: {}".format(list(data['cards'])))
-        else:
-            pass
+        if room['card_czar'] in room['selected_cards'].keys():
+            winning_card = room['selected_cards'][room['card_czar']]
+            del room['selected_cards'][room['card_czar']]
+            winning_player = {" ".join(v): k for k, v in room['selected_cards'].items()}[" ".join(winning_card)]
+            if winning_player not in room['points'].keys():
+                room['points'][winning_player] = 0
+            room['points'][winning_player] += 1
+            room['winning_card'] = winning_card
+            room['winning_player'] = winning_player
+            room['game_phase'] = 'setup_next'
+            room['players_submitted'] = []
+        if len(room['white_cards']) < 1:
+            room['game_phase'] = 'setup_next'
 
-    player_room['submitted'] = username in player_room['players_submitted']
+    send_room(room_name)
 
-    return make_response(jsonify(player_room))
+
+def send_room(room_name):
+    room = rooms[room_name]
+    for sid in room['usernames'].keys():
+        username = room['usernames'][sid]
+        data = {
+            'game_phase': room['game_phase'],
+            'card_czar': room['card_czar'],
+            'black_card': room['black_card']
+        }
+
+        if room['game_phase'] == 'setup_next':
+            data['num_to_select'] = 0
+            data['card_czar'] = ""
+            data['submitted'] = username in room['players_submitted']
+            if "winning_card" in room.keys():
+                data['white_card_title'] = '{} wins the round!'.format(room['winning_player'])
+                data['white_cards'] = [room['winning_card']]
+            else:
+                data['white_card_title'] = 'Your Hand'
+                data['white_cards'] = [[e] for e in room['hands'][username]]
+
+        elif room['game_phase'] == 'select_card':
+            if data['card_czar'] == username or username in room['selected_cards'].keys():
+                data['num_to_select'] = 0
+                data['white_card_title'] = 'Players Submitted'
+                data['white_cards'] = list([[e] for e in room['selected_cards'].keys()])
+            else:
+                data['num_to_select'] = room['black_card']['pick']
+                data['white_cards'] = [[e] for e in room['hands'][username]]
+                data['white_card_title'] = "Make a Selection"
+
+        elif room['game_phase'] == 'select_winner':
+            if data['card_czar'] == username:
+                data['white_card_title'] = 'Select a Winner'
+            else:
+                data['white_card_title'] = 'Submitted Cards'
+            data['white_cards'] = list(room['selected_cards'].values())
+            data['num_to_select'] = 1 if data['card_czar'] == username else 0
+            data['submitted'] = username in room['players_submitted']
+
+        emit('update', data, room=sid)
 
 
 def get_next_czar(room):
-    if room['last_card_czar'] is None or room['card_czar'] not in room['players']:
+    if room['card_czar'] is None or room['card_czar'] not in room['usernames'].values():
         index = -1
     else:
-        index = list(room['players']).index(room['last_card_czar'])
-    if index < 0 or index == len(room['players'])-1:
+        index = list(room['usernames'].values()).index(room['card_czar'])
+    if index < 0 or index == len(room['usernames'].values()) - 1:
         index = -1
-    last_card_czar = room['players'][index]
-    return last_card_czar
+    new_czar = list(room['usernames'].values())[index + 1]
+    return new_czar
 
 
 @app.route('/get/packs', methods=['GET'])
@@ -209,13 +244,17 @@ def get_packs():
     return make_response(jsonify(packs))
 
 
-def update_function():
-    while True:
-        tick = time()
-        update_rooms()
-        sleep(max(0, 2 - (time() - tick)))
+@app.route('/check_username', methods=['POST'])
+def check_username():
+    username = request.json['username']
+    room_name = request.json['room']['name']
+    if 3 <= len(username) <= 10:
+        if username in rooms[room_name]['connected_players']:
+            return make_response(jsonify({}), 409)
+        return make_response(jsonify({}), 200)
+    else:
+        return make_response(jsonify({}), 400)
 
+sid_rooms = {}
 rooms = {}
-usernames = []
-update_runner = Runner(update_function)
-update_runner.run()
+decks = {}

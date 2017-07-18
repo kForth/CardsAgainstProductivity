@@ -11,7 +11,6 @@
 
     </ons-toolbar>
 
-
     <section style="padding: 8px; text-align: center">
         <b ng-show="room.card_czar === username && room.game_phase != 'setup_next'">You are the Card Czar.</b>
         <b ng-show="room.card_czar != username && room.game_phase != 'setup_next'">{{ room.card_czar }} is the
@@ -32,26 +31,28 @@
     <section class="card_area">
         <div class="card white_card" ng-repeat="card in room.white_cards"
              ng-class="{'selected': selected_cards.indexOf(card) > -1}" ng-click="selectCard(card)">
-            {{ isArray(card) }}
-            <div ng-show="isArray(card)" ng-repeat="c in card">{{ c }}<p></p></div>
-            <div ng-show="!isArray(card)">{{ card }}</div>
-            <div class="select_num" ng-show="selected_cards.indexOf(card) > -1">{{ selected_cards.indexOf(card)
-                + 1 }}
+            <div ng-repeat="elem in card">
+                {{ elem }}
+                <hr ng-show="elem != card[card.length - 1]">
+            </div>
+            <div class="select_num" ng-show="selected_cards.indexOf(card.toString()) > -1">
+                {{ selected_cards.indexOf(card.toString()) + 1 }}
             </div>
         </div>
     </section>
 
     <section style="padding: 8px">
-        <ons-button modifier="large" ng-click="submitUser()"
-                    ng-show="room.game_phase=='select_winner' && room.card_czar == username && !room.submitted">
+        <ons-button modifier="large" ng-click="submitButton()"
+                    ng-show="room.game_phase=='select_winner' && room.card_czar == username && !room.submitted && room.num_to_select == selected_cards.length">
             Submit
         </ons-button>
-        <ons-button modifier="large" ng-click="submitUser()"
-                    ng-show="room.game_phase=='select_card' && !room.submitted && room.card_czar != username">
+        <ons-button modifier="large" ng-click="submitButton()"
+                    ng-show="room.game_phase=='select_card' && !room.submitted && room.card_czar != username && !room.submitted && room.num_to_select == selected_cards.length">
             Submit
         </ons-button>
-        <ons-button modifier="large" ng-click="submitUser()"
-                    ng-show="room.game_phase=='setup_next' && !room.submitted">Ready
+        <ons-button modifier="large" ng-click="submitButton()"
+                    ng-show="room.game_phase=='setup_next' && !room.submitted && !room.submitted && room.num_to_select == selected_cards.length">
+            Ready
         </ons-button>
     </section>
 

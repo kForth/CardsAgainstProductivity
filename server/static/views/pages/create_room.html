@@ -13,6 +13,9 @@
     </ons-toolbar>
 
     <section style="padding: 8px">
+        <b>Username:</b>
+        <ons-input modifier="underbar" style="width: 100%" ng-model="username"></ons-input>
+        <p></p>
         <b>Room Name:</b>
         <ons-input modifier="underbar" style="width: 100%" ng-model="room_name"></ons-input>
         <p></p>
@@ -37,6 +40,7 @@
                 <ons-icon icon="ion-ios-circle-outline" ng-show="selected_packs.indexOf(pack.id) < 0" class="checkbox_icon"></ons-icon>
                 {{ pack.name }}
             </ons-list-item>
+
         </ons-list>
 
     </section>

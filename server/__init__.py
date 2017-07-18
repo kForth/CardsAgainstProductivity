@@ -1,7 +1,6 @@
 import json
 from glob import glob
 from random import shuffle
-from time import time, sleep
 
 from flask import Flask, jsonify, make_response, request
 from flask_socketio import SocketIO, emit, join_room, leave_room
@@ -9,15 +8,6 @@ from flask_socketio import SocketIO, emit, join_room, leave_room
 from server.runners import Runner
 
 app = Flask(__name__)
-
-
-def remove_player(username, room_name):
-    if room_name in rooms.keys():
-        room = rooms[room_name]
-        if username in room['players']:
-            del room['players'][room['players'].index(username)]
-            return True
-    return False
 socketio = SocketIO(app)
 
 

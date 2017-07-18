@@ -4,6 +4,7 @@ from random import shuffle
 from time import time, sleep
 
 from flask import Flask, jsonify, make_response, request
+from flask_socketio import SocketIO, emit, join_room, leave_room
 
 from server.runners import Runner
 
@@ -17,6 +18,7 @@ def remove_player(username, room_name):
             del room['players'][room['players'].index(username)]
             return True
     return False
+socketio = SocketIO(app)
 
 
 def load_deck(decks):

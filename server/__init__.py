@@ -32,7 +32,17 @@ def load_deck(decks):
 
 @socketio.on('connect', namespace='/game')
 def connect():
-    emit('info', 'Connected!', namespace='/game')
+    print("New Connection")
+
+
+@socketio.on('message', namespace='/game')
+def message(data):
+    sid = request.sid
+    room = rooms[sid_rooms[sid]]
+    author = room['usernames'][sid]
+    target = data['target']
+    target_sid = {v: k for k, v in room['usernames'].items()}[target]
+    emit('alert', 'From: {0} \n "{1}"'.format(author, data['message']), room=target_sid)
 
 
 @socketio.on('join', namespace='/game')

@@ -201,4 +201,38 @@ module.controller('RoomController', function ($scope, $http, $cookies, $timeout,
         }
     };
 
+    $scope.sendMessage = function(){
+        $scope.playerOptionsDialog.hide();
+        ons.notification.prompt("What is your message?")
+            .then(function(resp){
+                if(resp != undefined && resp.length > 0){
+                    console.log(resp);
+                    var data = {
+                        'target': $scope.focussedPlayer,
+                        'message': resp
+                    };
+                    socket.emit('message', data);
+                    ons.notification.alert("Message Sent");
+                }
+                else{
+                    ons.notification.alert("Message Not Sent");
+                }
+            });
+    };
+
+    $scope.openPlayerOptions = function(player){
+        if(player === $scope.username){
+            return;
+        }
+        $scope.focussedPlayer = player;
+        $scope.splitter.left.close();
+        $scope.playerOptionsDialog.show();
+    };
+
+    var data = {
+        'username': $cookies.get('username'),
+        'room_name': $cookies.get('room_name')
+    };
+    socket.emit('join', data);
+
 });

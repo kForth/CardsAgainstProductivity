@@ -1,4 +1,4 @@
-var module = angular.module('app', ['onsen', 'ngCookies', 'btford.socket-io']);
+var module = angular.module('app', ['onsen', 'ngCookies', 'btford.socket-io', 'angular-md5']);
 
 module.controller('AppController', function ($scope, $cookies, $http) {
         $scope.nav = function (page) {
@@ -14,7 +14,7 @@ module.controller('AppController', function ($scope, $cookies, $http) {
         return socket;
     });
 
-module.controller('NavigationController', function ($scope, $http, $cookies) {
+module.controller('NavigationController', function ($scope, $http, $cookies, md5) {
     ons.ready(function () {
         $scope.navi.pushPage('../../../static/views/pages/home.html');
     });
@@ -46,7 +46,7 @@ module.controller('NavigationController', function ($scope, $http, $cookies) {
     function checkPrivacy(room){
         if (room.privacy == 'private') {
             ons.notification.prompt('What is the password?').then(function (password) {
-                if (password == room.password) {
+                if (md5.createHash(password) == room.password) {
                     $scope.actuallyJoin(room);
                 }
                 else {
@@ -70,7 +70,7 @@ module.controller('NavigationController', function ($scope, $http, $cookies) {
 
 });
 
-module.controller('CreateRoomController', function ($scope, $http, $cookies) {
+module.controller('CreateRoomController', function ($scope, $http, $cookies, md5) {
     $scope.username = $cookies.get('username');
     $scope.isArray = angular.isArray;
 
@@ -81,10 +81,10 @@ module.controller('CreateRoomController', function ($scope, $http, $cookies) {
 
     $scope.createRoom = function () {
         var data = {
-            'username': $scope.username,
             'name': $scope.room_name,
-            'password': $scope.room_password,
             'privacy': ($scope.room_password != undefined && $scope.room_password.length > 0 ? 'private' : 'public'),
+            'owner': $scope.username,
+            'password': $scope.room_password == undefined ? undefined : md5.createHash($scope.room_password),
             'packs': $scope.selected_packs
         };
 

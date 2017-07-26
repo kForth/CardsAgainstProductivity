@@ -1,5 +1,4 @@
 <ons-page id="create_room" ng-controller="JoinRoomController">
-
     <ons-toolbar>
         <div class="left">
             <ons-back-button>Cancel</ons-back-button>
@@ -17,6 +16,7 @@
             <ons-list-item ng-click="selectRoom(room)">
                 {{ room.name }}
                 <div class="right">
+                    {{ room.connected_players.length }}/{{ room.max_players }}
                     <ons-toolbar-button>
                         <ons-icon ng-if="room.privacy == 'private'" icon="ion-locked"></ons-icon>
                         <ons-icon ng-if="room.privacy == 'public'" icon="ion-person-stalker"></ons-icon>
@@ -25,5 +25,4 @@
             </ons-list-item>
         </ons-list>
     </section>
-
 </ons-page>

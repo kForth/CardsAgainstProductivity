@@ -1,6 +1,5 @@
 import json
 from glob import glob
-from random import shuffle
 
 from flask import Flask, jsonify, make_response, request
 from flask_socketio import SocketIO, emit, join_room, leave_room
@@ -11,23 +10,20 @@ from server.runners import Runner
 app = Flask(__name__)
 socketio = SocketIO(app)
 
+sid_rooms = {}
+rooms = {}
+decks = {}
 
-def load_deck(decks):
-    decks.append("base_cards")
-    black_cards = []
-    white_cards = []
-    for d in decks:
-        cards = json.load(open('cards/{}.json'.format(d)))
-        black_cards += cards["cards"]["blackCards"]
-        white_cards += cards["cards"]["whiteCards"]
 
-    shuffle(black_cards)
-    shuffle(white_cards)
-    data = {
-        'black_cards': black_cards,
-        'white_cards': white_cards
-    }
-    return data
+def get_next_czar(room):
+    if room['card_czar'] is None or room['card_czar'] not in room['usernames'].values():
+        index = -1
+    else:
+        index = list(room['usernames'].values()).index(room['card_czar'])
+    if index < 0 or index == len(room['usernames'].values()) - 1:
+        index = -1
+    new_czar = list(room['usernames'].values())[index + 1]
+    return new_czar
 
 
 @socketio.on('connect', namespace='/game')
@@ -47,20 +43,22 @@ def message(data):
 
 @socketio.on('join', namespace='/game')
 def join(data):
+    sid = request.sid
     username = data['username']
     room_name = data['room_name']
-    join_room(room_name)
-    sid = request.sid
-    room = rooms[room_name]
     sid_rooms[sid] = room_name
+    room = rooms[room_name]
     room['usernames'][sid] = username
     room['connected_players'].append(username)
-    num_cards = 7
+    num_cards = room['hand_size']
+    if username not in room['points'].keys():
+        room['points'][username] = 0
     if username in room['hands'].keys():
         num_cards -= len(room['hands'][username])
     else:
         room['hands'][username] = []
     room['hands'][username] += decks[room_name].draw_white_cards(num_cards)
+    join_room(room_name)
     update_room(room_name)
 
 
@@ -80,6 +78,17 @@ def submit(selected_cards=None):
     update_room(room_name)
 
 
+@socketio.on('unsubmit_button', namespace='/game')
+def unsubmit():
+    sid = request.sid
+    room_name = sid_rooms[sid]
+    room = rooms[room_name]
+    username = room['usernames'][sid]
+    if username in room['players_submitted']:
+        room['players_submitted'].remove(username)
+    update_room(room_name)
+
+
 @socketio.on('leave', namespace='/game')
 def leave():
     sid = request.sid
@@ -88,6 +97,9 @@ def leave():
     leave_room(room_name)
     username = room['usernames'][sid]
     room['connected_players'].remove(room['usernames'][sid])
+    if username == room['card_czar']:
+        room['game_phase'] = 'setup_next'
+        emit('alert', "The Card Czar has left the room.", room=room_name)
     del sid_rooms[sid]
     del room['usernames'][sid]
     del room['hands'][username]
@@ -99,15 +111,20 @@ def leave():
 def disconnect():
     sid = request.sid
     room = rooms[sid_rooms[sid]]
+    username = room['usernames'][sid]
     room_name = room["name"]
-    leave_room(room_name)
     room['connected_players'].remove(room['usernames'][sid])
+    leave_room(room_name)
+    if username == room['card_czar']:
+        room['game_phase'] = 'setup_next'
+        emit('alert', "The Card Czar has left the room.", room=room_name)
     del room['usernames'][sid]
     del sid_rooms[sid]
     if len(room['usernames'].keys()) < 1:
         del decks[room['name']]
         del rooms[room['name']]
-    update_room(room_name)
+    else:
+        update_room(room_name)
 
 
 @app.route('/')
@@ -123,10 +140,13 @@ def create_room():
     room_data['game_phase'] = 'setup_next'
     room_data['card_czar'] = ''
     room_data['black_card'] = {
-        'text': '',
-        'owner': '',
+        'text':       'Waiting for game to start.',
         'num_select': 0
     }
+    room_data['min_players'] = 2
+    room_data['max_players'] = 10
+    room_data['hand_size'] = 7
+    room_data['max_points'] = 10
     room_data['hands'] = {}
     room_data['usernames'] = {}
     room_data['connected_players'] = []
@@ -151,9 +171,10 @@ def update_room(room_name):
         for player in room['usernames'].values():
             if player not in room['hands'].keys():
                 room['hands'][player] = []
-            room['hands'][player] += decks[room_name].draw_white_cards(7 - len(room['hands'][player]))
+            room['hands'][player] += decks[room_name].draw_white_cards(room['hand_size'] - len(room['hands'][player]))
 
-        if len(room['players_submitted']) == len(room['usernames'].values()) and len(room['usernames'].values()) >= 2:
+        if len(room['players_submitted']) == len(room['usernames'].values()) and len(room['usernames'].values()) >= \
+                room['min_players']:
             room['card_czar'] = get_next_czar(room)
             room['black_card'] = decks[room_name].draw_black_card()
             room['black_card']['text'] = room['black_card']['text'].replace('_', '________')
@@ -173,11 +194,13 @@ def update_room(room_name):
             winning_card = room['selected_cards'][room['card_czar']]
             del room['selected_cards'][room['card_czar']]
             winning_player = {" ".join(v): k for k, v in room['selected_cards'].items()}[" ".join(winning_card)]
-            if winning_player not in room['points'].keys():
-                room['points'][winning_player] = 0
             room['points'][winning_player] += 1
             room['winning_card'] = winning_card
             room['winning_player'] = winning_player
+            if room['points'][winning_player] >= room['max_points']:
+                emit('alert', "{} has won the game!".format(winning_player), room=room_name)
+                for player in room['points']:
+                    room['points'][player] = 0
             room['game_phase'] = 'setup_next'
             room['players_submitted'] = []
         if len(room['white_cards']) < 1:
@@ -191,9 +214,11 @@ def send_room(room_name):
     for sid in room['usernames'].keys():
         username = room['usernames'][sid]
         data = {
-            'game_phase': room['game_phase'],
-            'card_czar': room['card_czar'],
-            'black_card': room['black_card']
+            'game_phase': room       ['game_phase'],
+            'card_czar': room        ['card_czar'],
+            'black_card': room       ['black_card'],
+            'points': room           ['points'],
+            'connected_players': room['connected_players']
         }
 
         if room['game_phase'] == 'setup_next':
@@ -206,6 +231,8 @@ def send_room(room_name):
             else:
                 data['white_card_title'] = 'Your Hand'
                 data['white_cards'] = [[e] for e in room['hands'][username]]
+            if 'winning_player' in room.keys():
+                data['winning_player'] = room['winning_player']
 
         elif room['game_phase'] == 'select_card':
             if data['card_czar'] == username or username in room['selected_cards'].keys():
@@ -229,17 +256,6 @@ def send_room(room_name):
         emit('update', data, room=sid)
 
 
-def get_next_czar(room):
-    if room['card_czar'] is None or room['card_czar'] not in room['usernames'].values():
-        index = -1
-    else:
-        index = list(room['usernames'].values()).index(room['card_czar'])
-    if index < 0 or index == len(room['usernames'].values()) - 1:
-        index = -1
-    new_czar = list(room['usernames'].values())[index + 1]
-    return new_czar
-
-
 @app.route('/get/packs', methods=['GET'])
 def get_packs():
     files = glob('cards/*.json')
@@ -248,7 +264,7 @@ def get_packs():
         if file == 'cards/base_cards.json':
             continue
         packs.append({
-            'id':   file[6:-5],
+            'id': file                   [6:-5],
             'name': json.load(open(file))['name']
         })
     return make_response(jsonify(packs))
@@ -264,7 +280,3 @@ def check_username():
         return make_response(jsonify({}), 200)
     else:
         return make_response(jsonify({}), 400)
-
-sid_rooms = {}
-rooms = {}
-decks = {}

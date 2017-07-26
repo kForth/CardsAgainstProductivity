@@ -1,6 +1,6 @@
 var module = angular.module('app', ['onsen', 'ngCookies', 'btford.socket-io', 'angular-md5']);
 
-module.controller('AppController', function ($scope, $cookies, $http) {
+module.controller('AppController', function ($scope) {
         $scope.nav = function (page) {
             $scope.navi.pushPage('../../../static/views/pages/' + page);
         };
@@ -140,55 +140,48 @@ module.controller('JoinRoomController', function ($scope, $http, $timeout) {
 
 module.controller('RoomController', function ($scope, $http, $cookies, $timeout, socket) {
     $scope.username = $cookies.get('username');
-    $scope.selected_cards = [];
-    var cards_to_submit = [];
     $scope.room = {};
     $scope.room.game_phase = '';
-    $scope.sidebar_shown = false;
+    $scope.selected_cards = [];
+    var last_game_phase = '';
+    var cards_to_submit = [];
 
     socket.forward('info', $scope);
     $scope.$on('socket:info', function (ev, data) {
-        console.log(data);
+        // console.log(data);
     });
 
-    var last_game_phase;
+    socket.forward('alert', $scope);
+    $scope.$on('socket:alert', function (ev, data) {
+        ons.notification.alert(data);
+    });
+
     socket.forward('update', $scope);
     $scope.$on('socket:update', function (ev, data) {
-        console.log("UPDATE!!!");
         $scope.room = data;
         if(last_game_phase != $scope.room.game_phase){
-            console.log("New Phase");
             $scope.selected_cards = [];
             cards_to_submit = [];
         }
         last_game_phase = $scope.room.game_phase;
     });
 
-    var data = {
-        'username': $cookies.get('username'),
-        'room_name': $cookies.get('room_name')
-    };
-    socket.emit('join', data);
-
-    /*
-     * Game Phases
-     *
-     * 1. select_card - Card Czar is set, Black Card is selected, players select White Card(s), czar sees "Fake" cards as submitted, players see hand.
-     * 2. select_winner - Card Czar selects winning card, players and czar see submitted cards
-     * 3. setup_next - Card czar un-set, point awarded, players get new card(s), players see hands, wait for ready buttons
-     *
-     */
-
-
-    $scope.enableMenu = function(){
-        console.log("Enable Menu");
-        // document.getElementById('menu').open();
-    };
-
     $scope.submitButton = function () {
         socket.emit('submit_button', cards_to_submit);
     };
 
+    $scope.unsubmitButton = function () {
+        socket.emit('unsubmit_button');
+    };
+
+    $scope.leaveRoom = function(){
+        ons.notification.confirm("Are you sure you want to leave?")
+            .then(function(resp){
+                if(resp){
+                    console.log("Leaving");
+                }
+            });
+    };
 
     $scope.selectCard = function (card) {
         if($scope.selected_cards.indexOf(card.toString()) > -1) {

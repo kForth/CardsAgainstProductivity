@@ -15,7 +15,6 @@
 .card_area {
     padding: 0;
     margin: 0;
-    /*height: 300px;*/
     overflow-y: scroll;
     height: calc(100% - 250px);
 }

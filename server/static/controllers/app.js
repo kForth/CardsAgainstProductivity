@@ -128,10 +128,14 @@ module.controller('CreateRoomController', function ($scope, $http, $cookies) {
     }
 });
 
-module.controller('JoinRoomController', function ($scope, $http) {
-    $http.get('/get/rooms').then(function (resp) {
-        $scope.rooms = resp.data;
-    });
+module.controller('JoinRoomController', function ($scope, $http, $timeout) {
+    function loadRooms(){
+        $http.get('/get/rooms').then(function (resp) {
+            $scope.rooms = resp.data;
+            $timeout(loadRooms, 10000);
+        });
+    }
+    $timeout(loadRooms, 0);
 });
 
 module.controller('RoomController', function ($scope, $http, $cookies, $timeout, socket) {
